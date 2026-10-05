@@ -55,7 +55,16 @@ def run(cmd, check=True, capture=False, cwd=ROOT):
 
 def probe(path):
     """Return (duration_seconds, has_audio) using ffprobe."""
-    r = run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type",
+    net = []
+    if re.match(r"^https?://", path):
+        # ffprobe ignores the usual proxy/CA environment variables; pass them explicitly if set.
+        proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        ca = os.environ.get("SSL_CERT_FILE") or os.environ.get("CURL_CA_BUNDLE")
+        if proxy:
+            net += ["-http_proxy", proxy]
+        if ca and path.startswith("https"):
+            net += ["-ca_file", ca]
+    r = run(["ffprobe", "-v", "error"] + net + ["-show_entries", "format=duration:stream=codec_type",
              "-of", "json", path], check=False, capture=True)
     if r.returncode != 0:
         return 0.0, False
